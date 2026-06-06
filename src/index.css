@@ -1,0 +1,335 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TOKENS
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --blue-glow: #3b82f6;
+  --blue-bright: #60a5fa;
+  --blue-deep: #1d4ed8;
+  --bg-dark: #030712;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background-color: var(--bg-dark);
+  color: #ffffff;
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #0a0a0f; }
+::-webkit-scrollbar-thumb { background: #1d4ed8; border-radius: 3px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BACKGROUND GLOW ORBS
+   ═══════════════════════════════════════════════════════════════════════════ */
+.glow-orb-1 {
+  position: fixed; top: -200px; left: 50%; transform: translateX(-50%);
+  width: 800px; height: 800px;
+  background: radial-gradient(circle, rgba(59,130,246,0.11) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+  animation: pulseOrb1 7s ease-in-out infinite;
+}
+.glow-orb-2 {
+  position: fixed; bottom: -300px; right: -200px;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(29,78,216,0.14) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+  animation: pulseStatic 9s ease-in-out infinite reverse;
+}
+.glow-orb-3 {
+  position: fixed; top: 40%; left: -200px;
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(96,165,250,0.07) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+  animation: pulseStatic 11s ease-in-out infinite;
+}
+
+@keyframes pulseOrb1 {
+  0%, 100% { opacity: 0.7; transform: translateX(-50%) scale(1); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.07); }
+}
+@keyframes pulseStatic {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GLASSMORPHISM CARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+.glass-card {
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  transition: all 0.3s ease;
+}
+.glass-card:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(96,165,250,0.2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NAVBAR
+   ═══════════════════════════════════════════════════════════════════════════ */
+.navbar-glass {
+  background: rgba(3,7,18,0.75);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TYPOGRAPHY
+   ═══════════════════════════════════════════════════════════════════════════ */
+.glow-text {
+  text-shadow: 0 0 80px rgba(96,165,250,0.5), 0 0 120px rgba(59,130,246,0.25);
+}
+.gradient-text {
+  background: linear-gradient(135deg, #93c5fd 0%, #3b82f6 40%, #60a5fa 70%, #bfdbfe 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BUTTONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+.btn-primary {
+  background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 50%, #2563eb 100%);
+  border: none;
+  position: relative; overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 30px rgba(59,130,246,0.35), 0 0 60px rgba(59,130,246,0.08);
+}
+.btn-primary::before {
+  content: '';
+  position: absolute; top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.13), transparent);
+  transition: left 0.5s ease;
+}
+.btn-primary:hover::before { left: 100%; }
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 50px rgba(59,130,246,0.55), 0 0 100px rgba(59,130,246,0.18);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid rgba(96,165,250,0.35);
+  color: #93c5fd;
+  transition: all 0.3s ease;
+}
+.btn-outline:hover {
+  background: rgba(59,130,246,0.1);
+  border-color: rgba(96,165,250,0.7);
+  box-shadow: 0 0 30px rgba(59,130,246,0.18);
+  transform: translateY(-2px);
+  color: #bfdbfe;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INPUTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+.hero-input {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: white;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+  outline: none;
+}
+.hero-input:focus {
+  border-color: rgba(96,165,250,0.6);
+  background: rgba(59,130,246,0.06);
+  box-shadow: 0 0 0 4px rgba(59,130,246,0.1), 0 0 30px rgba(59,130,246,0.12);
+}
+.hero-input::placeholder { color: rgba(148,163,184,0.4); }
+
+/* Remove number input arrows */
+.hero-input::-webkit-inner-spin-button,
+.hero-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MATRIX TABLE
+   ═══════════════════════════════════════════════════════════════════════════ */
+.matrix-table {
+  border-collapse: separate;
+  border-spacing: 4px;
+  width: 100%;
+}
+
+.matrix-corner {
+  width: 44px;
+  min-width: 44px;
+}
+
+.matrix-col-header {
+  text-align: center;
+  color: rgba(96,165,250,0.9);
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: 0.05em;
+  padding: 6px 4px;
+  min-width: 64px;
+}
+
+.matrix-row-header {
+  text-align: center;
+  color: rgba(96,165,250,0.9);
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: 0.05em;
+  padding: 4px 8px;
+}
+
+.matrix-cell-td {
+  padding: 2px;
+}
+
+.matrix-cell-diag {
+  width: 60px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(59,130,246,0.06);
+  border: 1px solid rgba(59,130,246,0.15);
+  border-radius: 10px;
+  color: rgba(96,165,250,0.4);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: not-allowed;
+}
+
+.matrix-cell-input {
+  width: 60px;
+  height: 44px;
+  text-align: center;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 10px;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  outline: none;
+  transition: all 0.25s ease;
+  -moz-appearance: textfield;
+}
+.matrix-cell-input::-webkit-inner-spin-button,
+.matrix-cell-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+.matrix-cell-input::placeholder { color: rgba(148,163,184,0.25); }
+.matrix-cell-input:focus {
+  border-color: rgba(96,165,250,0.55);
+  background: rgba(59,130,246,0.08);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+}
+.matrix-cell-input:hover:not(:focus) {
+  border-color: rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MISC
+   ═══════════════════════════════════════════════════════════════════════════ */
+.icon-glow {
+  box-shadow: 0 0 25px rgba(59,130,246,0.35);
+  background: linear-gradient(135deg, rgba(29,78,216,0.28), rgba(59,130,246,0.18));
+  border: 1px solid rgba(96,165,250,0.25);
+}
+
+.nav-link {
+  color: rgba(148,163,184,0.85);
+  transition: color 0.25s ease;
+  position: relative;
+}
+.nav-link::after {
+  content: '';
+  position: absolute; bottom: -4px; left: 0;
+  width: 0; height: 1px;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  transition: width 0.3s ease;
+}
+.nav-link:hover { color: #93c5fd; }
+.nav-link:hover::after { width: 100%; }
+
+.logo-mark {
+  background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+  box-shadow: 0 0 18px rgba(59,130,246,0.45);
+}
+
+.glow-separator {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(96,165,250,0.4), rgba(59,130,246,0.6), rgba(96,165,250,0.4), transparent);
+}
+
+.stat-card { position: relative; overflow: hidden; }
+.stat-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(96,165,250,0.5), transparent);
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ANIMATIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-fade-in-up { animation: fadeInUp 0.65s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-fade-in { animation: fadeIn 0.5s ease both; }
+.animate-spin { animation: spin 1s linear infinite; }
+
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .glow-orb-1 { width: 380px; height: 380px; }
+  .matrix-cell-input, .matrix-cell-diag { width: 50px; height: 40px; font-size: 0.8rem; }
+}
+
+/* Mobile nav helpers */
+@media (max-width: 767px) {
+  .hide-mobile { display: none !important; }
+}
+@media (min-width: 768px) {
+  .show-mobile { display: none !important; }
+}
+
+/* fadeUp keyframe used by inline animation strings */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
