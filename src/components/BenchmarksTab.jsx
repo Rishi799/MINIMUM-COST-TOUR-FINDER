@@ -5,25 +5,39 @@ export default function BenchmarksTab() {
   const [isRunning, setIsRunning] = useState(false)
   const [currentN, setCurrentN] = useState(null)
   const [results, setResults] = useState(null)
-  const [logScale, setLogScale] = useState(false)
+  const [logScale, setLogScale] = useState(true) // Start with Log scale by default for better visibility of polynomial vs exponential
   const [hoveredPoint, setHoveredPoint] = useState(null)
   const svgRef = useRef(null)
 
-  // Default pre-computed data to make the chart look gorgeous immediately
+  // Default pre-computed data to make the chart look gorgeous immediately (N=4 to 25)
   const [chartData, setChartData] = useState([
     { n: 4, hk: 0.05, bb: 0.02, ch: 0.01 },
     { n: 5, hk: 0.12, bb: 0.05, ch: 0.02 },
     { n: 6, hk: 0.35, bb: 0.10, ch: 0.02 },
     { n: 7, hk: 1.10, bb: 0.22, ch: 0.03 },
     { n: 8, hk: 3.80, bb: 0.45, ch: 0.04 },
-    { n: 9, hk: 12.5, bb: 1.20, ch: 0.05 },
-    { n: 10, hk: 48.0, bb: 4.80, ch: 0.07 },
-    { n: 11, hk: 195.0, bb: 18.50, ch: 0.09 },
+    { n: 9, hk: 12.50, bb: 1.20, ch: 0.05 },
+    { n: 10, hk: 48.00, bb: 4.80, ch: 0.07 },
+    { n: 11, hk: 195.00, bb: 18.50, ch: 0.09 },
+    { n: 12, hk: 450.00, bb: 75.00, ch: 0.12 },
+    { n: 13, hk: 1200.00, bb: 360.00, ch: 0.15 },
+    { n: 14, hk: 3200.00, bb: 1800.00, ch: 0.18 },
+    { n: 15, hk: 8500.00, bb: null, ch: 0.22 },
+    { n: 16, hk: 22000.00, bb: null, ch: 0.26 },
+    { n: 17, hk: 60000.00, bb: null, ch: 0.31 },
+    { n: 18, hk: null, bb: null, ch: 0.37 },
+    { n: 19, hk: null, bb: null, ch: 0.44 },
+    { n: 20, hk: null, bb: null, ch: 0.52 },
+    { n: 21, hk: null, bb: null, ch: 0.61 },
+    { n: 22, hk: null, bb: null, ch: 0.71 },
+    { n: 23, hk: null, bb: null, ch: 0.82 },
+    { n: 24, hk: null, bb: null, ch: 0.94 },
+    { n: 25, hk: null, bb: null, ch: 1.08 },
   ])
 
   const [progress, setProgress] = useState(0)
 
-  // Run a live test across sizes 4 to 11
+  // Run a live test across sizes 4 to 25
   const runLiveTest = () => {
     setIsRunning(true)
     setResults(null)
@@ -31,25 +45,34 @@ export default function BenchmarksTab() {
     const data = []
     
     let size = 4
-    const totalSteps = 8
+    const minN = 4, maxN = 25
+    const totalSteps = maxN - minN + 1 // 22 steps
+    
     const interval = setInterval(() => {
       setCurrentN(size)
-      setProgress(((size - 3) / totalSteps) * 100)
+      setProgress(((size - minN) / totalSteps) * 100)
 
-      const trials = 3
+      const trials = 2
       let hkTotal = 0, bbTotal = 0, chTotal = 0
 
       for (let t = 0; t < trials; t++) {
         const matrix = generateRandomMatrix(size)
         
-        const tHk = performance.now()
-        runHeldKarp(matrix)
-        hkTotal += performance.now() - tHk
+        // 1. Branch & Bound (Prune search tree) - only run up to 12
+        if (size <= 12) {
+          const tBb = performance.now()
+          runBranchAndBound(matrix)
+          bbTotal += performance.now() - tBb
+        }
 
-        const tBb = performance.now()
-        runBranchAndBound(matrix)
-        bbTotal += performance.now() - tBb
+        // 2. Held-Karp (Bitmask DP) - only run up to 17
+        if (size <= 17) {
+          const tHk = performance.now()
+          runHeldKarp(matrix)
+          hkTotal += performance.now() - tHk
+        }
 
+        // 3. Christofides (MST Approximation) - run up to 25
         const tCh = performance.now()
         runChristofides(matrix)
         chTotal += performance.now() - tCh
@@ -57,14 +80,14 @@ export default function BenchmarksTab() {
 
       data.push({
         n: size,
-        hk: parseFloat((hkTotal / trials).toFixed(4)),
-        bb: parseFloat((bbTotal / trials).toFixed(4)),
+        hk: size <= 17 ? parseFloat((hkTotal / trials).toFixed(4)) : null,
+        bb: size <= 12 ? parseFloat((bbTotal / trials).toFixed(4)) : null,
         ch: parseFloat((chTotal / trials).toFixed(4)),
       })
 
       setChartData([...data])
 
-      if (size === 11) {
+      if (size === maxN) {
         clearInterval(interval)
         setIsRunning(false)
         setCurrentN(null)
@@ -73,7 +96,7 @@ export default function BenchmarksTab() {
       } else {
         size++
       }
-    }, 250)
+    }, 180)
   }
 
   // Calculate SVG line points
@@ -82,12 +105,17 @@ export default function BenchmarksTab() {
   const chartW = W - padL - padR
   const chartH = H - padT - padB
 
-  const maxVal = Math.max(...chartData.map(d => Math.max(d.hk, d.bb, d.ch)), 1)
-  const minPositive = Math.max(Math.min(...chartData.map(d => Math.min(d.hk, d.bb, d.ch)).filter(v => v > 0)), 0.001)
+  const minN = 4, maxN = 25
+
+  // Robust values calculation ignoring null/skipped entries
+  const allNums = chartData.flatMap(d => [d.hk, d.bb, d.ch].filter(v => v !== null && v !== undefined && !isNaN(v)))
+  const maxVal = Math.max(...allNums, 1)
+  const minPositive = Math.max(Math.min(...allNums.filter(v => v > 0)), 0.001)
   
-  const getX = (n) => padL + ((n - 4) / 7) * chartW
+  const getX = (n) => padL + ((n - minN) / (maxN - minN)) * chartW
 
   const getY = (val) => {
+    if (val === null || val === undefined || isNaN(val)) return H - padB // fallback
     if (logScale) {
       const logMin = Math.log10(Math.max(minPositive, 0.001))
       const logMax = Math.log10(Math.max(maxVal, 0.01))
@@ -100,15 +128,17 @@ export default function BenchmarksTab() {
 
   // Build smooth path using cardinal spline-like approach
   const buildPath = (key) => {
-    return chartData.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(d.n)} ${getY(d[key])}`).join(' ')
+    const validPoints = chartData.filter(d => d[key] !== null && d[key] !== undefined && !isNaN(d[key]))
+    return validPoints.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(d.n)} ${getY(d[key])}`).join(' ')
   }
 
   // Build area path for gradient fill
   const buildAreaPath = (key) => {
-    const linePath = chartData.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(d.n)} ${getY(d[key])}`).join(' ')
-    if (chartData.length === 0) return ''
-    const lastX = getX(chartData[chartData.length - 1].n)
-    const firstX = getX(chartData[0].n)
+    const validPoints = chartData.filter(d => d[key] !== null && d[key] !== undefined && !isNaN(d[key]))
+    if (validPoints.length === 0) return ''
+    const linePath = validPoints.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(d.n)} ${getY(d[key])}`).join(' ')
+    const lastX = getX(validPoints[validPoints.length - 1].n)
+    const firstX = getX(validPoints[0].n)
     const baseline = H - padB
     return `${linePath} L ${lastX} ${baseline} L ${firstX} ${baseline} Z`
   }
@@ -130,7 +160,7 @@ export default function BenchmarksTab() {
       }
     })
 
-    if (nearestDist < 40) {
+    if (nearestDist < 25) {
       setHoveredPoint(nearestIdx)
     } else {
       setHoveredPoint(null)
@@ -164,7 +194,7 @@ export default function BenchmarksTab() {
             <p style={{ color: 'rgba(148,163,184,0.7)', fontSize: '0.82rem', lineHeight: 1.6, marginBottom: 24 }}>
               As the number of cities increases, exact algorithms encounter combinatorial explosions. 
               Held-Karp scales at <code style={{ color: '#3b82f6' }}>O(2ⁿ · n²)</code>, Branch & Bound worst-case scales at <code style={{ color: '#10b981' }}>O(n!)</code>, and Christofides scales at <code style={{ color: '#8b5cf6' }}>O(n³)</code>. 
-              This tester runs the solvers live on randomly generated matrices of sizes <strong>4 to 11</strong> to measure average clock cycles.
+              This tester runs the solvers live on randomly generated matrices of sizes <strong>4 to 25</strong> to measure average clock cycles, skipping slow models dynamically.
             </p>
 
             {/* Progress bar */}
@@ -204,7 +234,7 @@ export default function BenchmarksTab() {
                     <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
                     <polyline points="17 6 23 6 23 12"/>
                   </svg>
-                  Run Live Stress Test
+                  Run Live Stress Test (N=4..25)
                 </>
               )}
             </button>
@@ -221,18 +251,18 @@ export default function BenchmarksTab() {
             <h4 style={{ color: 'white', fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: '0.9rem', marginBottom: 14 }}>Algorithm Complexity Quick-Reference</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {[
-                { name: 'Held-Karp', time: 'O(2ⁿ · n²)', space: 'O(2ⁿ · n)', type: 'Exact (DP)', color: '#3b82f6' },
-                { name: 'Branch & Bound', time: 'O(n!) worst', space: 'O(n)', type: 'Exact (Pruned DFS)', color: '#10b981' },
-                { name: 'Christofides', time: 'O(n³)', space: 'O(n²)', type: 'Approximation (≤1.5×)', color: '#8b5cf6' },
+                { name: 'Held-Karp', time: 'O(2ⁿ · n²)', space: 'O(2ⁿ · n)', type: 'Exact (DP) [Max 17]', color: '#3b82f6' },
+                { name: 'Branch & Bound', time: 'O(n!) worst', space: 'O(n²)', type: 'Exact (Reduced Matrix) [Max 12]', color: '#10b981' },
+                { name: 'Christofides', time: 'O(n³)', space: 'O(n²)', type: 'Approximation (≤1.5×) [Max 25+]', color: '#8b5cf6' },
               ].map(a => (
                 <div key={a.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: a.color }} />
                     <span style={{ color: 'white', fontSize: '0.8rem', fontWeight: 600 }}>{a.name}</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 16, fontSize: '0.72rem' }}>
-                    <span style={{ color: 'rgba(148,163,184,0.5)' }}>Time: <code style={{ color: a.color }}>{a.time}</code></span>
-                    <span style={{ color: 'rgba(148,163,184,0.5)' }}>Space: <code style={{ color: 'white' }}>{a.space}</code></span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, fontSize: '0.7rem' }}>
+                    <span style={{ color: 'rgba(148,163,184,0.6)' }}>Time: <code style={{ color: a.color }}>{a.time}</code></span>
+                    <span style={{ color: 'rgba(148,163,184,0.4)', fontSize: '0.62rem' }}>{a.type}</span>
                   </div>
                 </div>
               ))}
@@ -282,35 +312,25 @@ export default function BenchmarksTab() {
                 )
               })}
 
-              {/* X Axis Gridlines & Labels (N=4..11) */}
-              {Array.from({ length: 8 }, (_, idx) => {
-                const n = idx + 4
+              {/* X Axis Gridlines & Labels (N=4..25) */}
+              {Array.from({ length: maxN - minN + 1 }, (_, idx) => {
+                const n = idx + minN
                 const x = getX(n)
+                const showLabel = (n - minN) % 3 === 0 || n === maxN
                 return (
                   <g key={`grid-x-${idx}`}>
                     <line x1={x} y1={padT} x2={x} y2={H - padB} stroke="rgba(255,255,255,0.03)" />
-                    <text x={x} y={H - padB + 16} textAnchor="middle" fill="rgba(148,163,184,0.4)" fontSize="9" fontFamily="monospace">N={n}</text>
+                    {showLabel && (
+                      <text x={x} y={H - padB + 16} textAnchor="middle" fill="rgba(148,163,184,0.4)" fontSize="9" fontFamily="monospace">N={n}</text>
+                    )}
                   </g>
                 )
               })}
 
               {/* Area fills */}
-              <defs>
-                <linearGradient id="hkAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.15" />
-                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
-                </linearGradient>
-                <linearGradient id="bbAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.1" />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
-                </linearGradient>
-                <linearGradient id="chAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.08" />
-                  <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
-                </linearGradient>
-              </defs>
               <path d={buildAreaPath('hk')} fill="url(#hkAreaGrad)" />
               <path d={buildAreaPath('bb')} fill="url(#bbAreaGrad)" />
+              <path d={buildAreaPath('ch')} fill="url(#chAreaGrad)" />
 
               {/* Chart Lines */}
               <path d={buildPath('hk')} fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" style={{ filter: 'drop-shadow(0 0 6px rgba(59,130,246,0.3))' }} />
@@ -322,18 +342,22 @@ export default function BenchmarksTab() {
                 const isHovered = hoveredPoint === idx
                 return (
                   <g key={`dots-${idx}`}>
-                    {['hk', 'bb', 'ch'].map(key => (
-                      <circle
-                        key={key}
-                        cx={getX(d.n)}
-                        cy={getY(d[key])}
-                        r={isHovered ? 5 : 3.5}
-                        fill={algoColors[key]}
-                        stroke="#030712"
-                        strokeWidth={isHovered ? 2 : 1}
-                        style={{ transition: 'r 0.2s, stroke-width 0.2s' }}
-                      />
-                    ))}
+                    {['hk', 'bb', 'ch'].map(key => {
+                      const val = d[key]
+                      if (val === null || val === undefined || isNaN(val)) return null
+                      return (
+                        <circle
+                          key={key}
+                          cx={getX(d.n)}
+                          cy={getY(val)}
+                          r={isHovered ? 5 : 3.5}
+                          fill={algoColors[key]}
+                          stroke="#030712"
+                          strokeWidth={isHovered ? 2 : 1}
+                          style={{ transition: 'r 0.2s, stroke-width 0.2s' }}
+                        />
+                      )
+                    })}
                   </g>
                 )
               })}
@@ -363,29 +387,33 @@ export default function BenchmarksTab() {
             {hoveredPoint !== null && chartData[hoveredPoint] && (
               <div className="chart-tooltip" style={{
                 left: `${((getX(chartData[hoveredPoint].n)) / W) * 100}%`,
-                top: `${((getY(chartData[hoveredPoint].hk)) / H) * 100}%`,
+                top: `${((getY(chartData[hoveredPoint].ch)) / H) * 100}%`,
               }}>
                 <div style={{ fontWeight: 800, marginBottom: 4, color: '#60a5fa', fontFamily: "'Space Grotesk',sans-serif" }}>
                   N = {chartData[hoveredPoint].n}
                 </div>
-                {['hk', 'bb', 'ch'].map(key => (
-                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: algoColors[key] }} />
-                    <span style={{ color: 'rgba(148,163,184,0.7)' }}>{algoNames[key]}:</span>
-                    <span style={{ color: 'white', fontWeight: 700, fontFamily: 'monospace' }}>
-                      {chartData[hoveredPoint][key].toFixed(3)} ms
-                    </span>
-                  </div>
-                ))}
+                {['hk', 'bb', 'ch'].map(key => {
+                  const val = chartData[hoveredPoint][key]
+                  const valStr = (val === null || val === undefined || isNaN(val)) ? 'Skipped' : `${val.toFixed(3)} ms`
+                  return (
+                    <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: algoColors[key] }} />
+                      <span style={{ color: 'rgba(148,163,184,0.7)' }}>{algoNames[key]}:</span>
+                      <span style={{ color: val === null ? '#f87171' : 'white', fontWeight: 700, fontFamily: 'monospace' }}>
+                        {valStr}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
 
           {/* Chart Legend */}
-          <div style={{ display: 'flex', gap: 20, justifyContent: 'center', marginBottom: 24 }}>
+          <div style={{ display: 'flex', gap: 20, justifyContent: 'center', marginBottom: 24, flexWrap: 'wrap' }}>
             {[
-              { color: '#3b82f6', label: 'Held-Karp (Exact)' },
-              { color: '#10b981', label: 'Branch & Bound (Exact)' },
+              { color: '#3b82f6', label: 'Held-Karp (Exact DP)' },
+              { color: '#10b981', label: 'Branch & Bound (Exact B&B)' },
               { color: '#8b5cf6', label: 'Christofides (Approx)' },
             ].map(l => (
               <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -396,7 +424,7 @@ export default function BenchmarksTab() {
           </div>
 
           {/* Detailed Data List */}
-          <div style={{ overflowX: 'auto', flexGrow: 1 }}>
+          <div style={{ overflowX: 'auto', flexGrow: 1, maxHeight: 220 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -408,8 +436,9 @@ export default function BenchmarksTab() {
               </thead>
               <tbody>
                 {chartData.map((d, i) => {
-                  // Highlight winner per row
-                  const minTime = Math.min(d.hk, d.bb, d.ch)
+                  const vals = [d.hk, d.bb, d.ch].filter(v => v !== null && v !== undefined && !isNaN(v))
+                  const minTime = vals.length > 0 ? Math.min(...vals) : null
+                  
                   return (
                     <tr
                       key={d.n}
@@ -424,14 +453,14 @@ export default function BenchmarksTab() {
                       <td style={{ padding: '8px 6px', fontWeight: 700, color: 'white' }}>{d.n} Cities</td>
                       <td style={{
                         padding: '8px 6px', textAlign: 'right', fontFamily: 'monospace',
-                        color: d.hk === minTime ? '#3b82f6' : 'rgba(255,255,255,0.9)',
+                        color: d.hk === null ? '#ef4444' : d.hk === minTime ? '#3b82f6' : 'rgba(255,255,255,0.9)',
                         fontWeight: d.hk === minTime ? 800 : 400,
-                      }}>{d.hk.toFixed(3)} ms</td>
+                      }}>{d.hk === null ? 'Skipped' : `${d.hk.toFixed(3)} ms`}</td>
                       <td style={{
                         padding: '8px 6px', textAlign: 'right', fontFamily: 'monospace',
-                        color: d.bb === minTime ? '#10b981' : 'rgba(255,255,255,0.9)',
+                        color: d.bb === null ? '#ef4444' : d.bb === minTime ? '#10b981' : 'rgba(255,255,255,0.9)',
                         fontWeight: d.bb === minTime ? 800 : 400,
-                      }}>{d.bb.toFixed(3)} ms</td>
+                      }}>{d.bb === null ? 'Skipped' : `${d.bb.toFixed(3)} ms`}</td>
                       <td style={{
                         padding: '8px 6px', textAlign: 'right', fontFamily: 'monospace',
                         color: d.ch === minTime ? '#8b5cf6' : 'rgba(255,255,255,0.9)',

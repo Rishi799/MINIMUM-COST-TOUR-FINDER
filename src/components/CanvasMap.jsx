@@ -28,6 +28,9 @@ export default function CanvasMap() {
   // Custom start city/origin state
   const [startNodeIndex, setStartNodeIndex] = useState(0)
 
+  // Custom number of random nodes to generate (2-20)
+  const [randomCount, setRandomCount] = useState(10)
+
   const replayTimer = useRef(null)
   const svgRef = useRef(null)
 
@@ -389,12 +392,49 @@ export default function CanvasMap() {
           <p style={{ color: 'rgba(100,116,139,1)', fontSize: '0.75rem', marginTop: 2 }}>Click canvas to add cities, drag to move, double-click to remove</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={() => generateRandomLayout(10)} className="btn-outline" style={{ padding: '8px 14px', borderRadius: 10, fontSize: '0.8rem', cursor: 'pointer' }}>
-            Random (10)
-          </button>
-          <button onClick={() => generateRandomLayout(20)} className="btn-outline" style={{ padding: '8px 14px', borderRadius: 10, fontSize: '0.8rem', cursor: 'pointer' }}>
-            Random (20)
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '2px 8px' }}>
+            <span style={{ color: 'rgba(148,163,184,0.5)', fontSize: '0.72rem', fontWeight: 600 }}>Random Count:</span>
+            <input
+              type="number"
+              min="2"
+              max="20"
+              value={randomCount}
+              onChange={e => {
+                const val = parseInt(e.target.value, 10)
+                setRandomCount(isNaN(val) ? '' : Math.max(2, Math.min(20, val)))
+              }}
+              style={{
+                width: 48,
+                background: 'transparent',
+                border: 'none',
+                color: 'white',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                textAlign: 'center',
+                outline: 'none',
+                fontFamily: 'monospace'
+              }}
+            />
+            <button
+              onClick={() => {
+                const count = parseInt(randomCount, 10) || 10
+                generateRandomLayout(count)
+              }}
+              className="btn-ghost"
+              style={{
+                padding: '4px 8px',
+                borderRadius: 6,
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                background: 'rgba(59,130,246,0.1)',
+                color: '#60a5fa',
+                border: '1px solid rgba(59,130,246,0.2)'
+              }}
+            >
+              Generate
+            </button>
+          </div>
           <button onClick={() => { setCities([]); setResults(null); setAllResults(null); setStartNodeIndex(0) }} className="btn-outline" style={{ padding: '8px 14px', borderRadius: 10, fontSize: '0.8rem', cursor: 'pointer', borderColor: 'rgba(239,68,68,0.2)', color: '#f87171' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.06)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
             Clear
           </button>
