@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Remote temp file ignores
+__pycache__/
+_prs_temp*.pptx
+~$*.pptx
+*.pyc
