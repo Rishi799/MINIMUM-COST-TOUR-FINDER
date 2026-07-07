@@ -313,6 +313,7 @@ function drawBackground(ctx, pos, n) {
 
 function drawRouteEdge(ctx, pos, path, edgeIndex, dist, progress) {
   const u = path[edgeIndex], v = path[edgeIndex + 1]
+  if (u === undefined || v === undefined || !pos[u] || !pos[v]) return
   const x1 = pos[u].x, y1 = pos[u].y, x2 = pos[v].x, y2 = pos[v].y
   const ex = x1 + (x2 - x1) * progress, ey = y1 + (y2 - y1) * progress
 
@@ -923,7 +924,7 @@ function ResultsSection({ results, n, dist, algoName }) {
         {/* Right: graph */}
         <div className="glass-card" style={{ padding: '22px 24px' }}>
           <div style={{ color: 'rgba(100,116,139,1)', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 16 }}>Route Graph Visualization</div>
-          <GraphViz n={n} path={results.path} dist={dist} />
+          <GraphViz n={n} path={results.path} dist={dist} key={`graph-${results.path.join('-')}-${results.executionTime}`} />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginTop: 14 }}>
             {[
               { color: '#f59e0b', label: 'Start city' },
@@ -1080,7 +1081,7 @@ function ComparisonResults({ allResults, n, dist }) {
             {winner.name}
           </span>
         </div>
-        <GraphViz n={n} path={winner.path} dist={dist} />
+        <GraphViz n={n} path={winner.path} dist={dist} key={`graph-comp-${winner.path.join('-')}-${winner.executionTime}`} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginTop: 14 }}>
           {[
             { color: '#f59e0b', label: 'Start city' },
