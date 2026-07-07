@@ -2,8 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { runHeldKarp, runBranchAndBound, runChristofides, generateRandomMatrix, cityLabel } from './algorithms'
 import CanvasMap from './components/CanvasMap'
 import BenchmarksTab from './components/BenchmarksTab'
-import AlgorithmsInfo from './components/AlgorithmsInfo'
-import TeamTab from './components/TeamTab'
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ANIMATED COUNTER HOOK
@@ -134,8 +133,6 @@ function Navbar({ activeTab, setActiveTab }) {
     { id: 'visualizer', label: 'Matrix Visualizer' },
     { id: 'canvas-map', label: '2D Interactive Map' },
     { id: 'benchmarks', label: 'Benchmarks' },
-    { id: 'algorithms-info', label: 'Algorithms Info' },
-    { id: 'team', label: 'Team' },
   ]
   return (
     <nav style={{
@@ -1302,14 +1299,6 @@ export default function App() {
 
               {activeTab === 'benchmarks' && (
                 <BenchmarksTab />
-              )}
-
-              {activeTab === 'algorithms-info' && (
-                <AlgorithmsInfo />
-              )}
-
-              {activeTab === 'team' && (
-                <TeamTab />
               )}
             </div>
 
