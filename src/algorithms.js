@@ -2,6 +2,38 @@
 // TSP Algorithms for Minimum Cost Tour Finder
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Helper: check if matrix satisfies Metric TSP (Symmetric & Triangle Inequality)
+export function checkMetricTSP(dist) {
+  const n = dist.length
+  
+  // 1. Check Symmetry
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (Math.abs(dist[i][j] - dist[j][i]) > 1e-5) {
+        return { isMetric: false, reason: 'Asymmetric matrix' }
+      }
+    }
+  }
+
+  // 2. Check Triangle Inequality: d(i, k) <= d(i, j) + d(j, k)
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      for (let k = 0; k < n; k++) {
+        if (i !== j && j !== k && i !== k) {
+          if (dist[i][k] > dist[i][j] + dist[j][k]) {
+            return {
+              isMetric: false,
+              reason: `Triangle inequality violated: d(${cityLabel(i)},${cityLabel(k)}) > d(${cityLabel(i)},${cityLabel(j)}) + d(${cityLabel(j)},${cityLabel(k)}) (${dist[i][k]} > ${dist[i][j]} + ${dist[j][k]})`
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return { isMetric: true }
+}
+
 // Nearest Neighbor heuristic (used as initial upper bound for B&B)
 function nearestNeighbor(dist, n) {
   const visited = new Array(n).fill(false)
@@ -39,11 +71,10 @@ export function runHeldKarp(dist) {
   const t0 = performance.now()
 
   if (n === 1) {
-    return result([0, 0], 0, t0, 'O(2ⁿ · n²)', 'O(2ⁿ · n)')
+    return result([0, 0], 0, t0, 'O(2ⁿ · n²)', 'O(2ⁿ · n)', checkMetricTSP(dist))
   }
 
   const STATES = 1 << n
-  // Flat typed arrays for memory efficiency
   const dp = new Float64Array(STATES * n).fill(Infinity)
   const par = new Int16Array(STATES * n).fill(-1)
   const I = (mask, city) => mask * n + city
@@ -101,57 +132,125 @@ export function runHeldKarp(dist) {
   }
   path.push(0)
 
-  return result(path, minCost, t0, 'O(2ⁿ · n²)', 'O(2ⁿ · n)')
+  return result(path, minCost, t0, 'O(2ⁿ · n²)', 'O(2ⁿ · n)', checkMetricTSP(dist))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Branch & Bound  —  O(n!) worst case, significantly pruned
+// Matrix Reduction Branch & Bound  —  O(n!) worst case, heavily pruned
 // ─────────────────────────────────────────────────────────────────────────────
+function reduceMatrix(matrix) {
+  const n = matrix.length
+  let reductionCost = 0
+  
+  // Clone matrix to avoid modifying parent states
+  const reduced = matrix.map(row => [...row])
+
+  // 1. Row reduction
+  for (let i = 0; i < n; i++) {
+    let minVal = Infinity
+    for (let j = 0; j < n; j++) {
+      if (reduced[i][j] < minVal) minVal = reduced[i][j]
+    }
+    if (minVal !== Infinity && minVal > 0) {
+      reductionCost += minVal
+      for (let j = 0; j < n; j++) {
+        if (reduced[i][j] !== Infinity) reduced[i][j] -= minVal
+      }
+    }
+  }
+
+  // 2. Column reduction
+  for (let j = 0; j < n; j++) {
+    let minVal = Infinity
+    for (let i = 0; i < n; i++) {
+      if (reduced[i][j] < minVal) minVal = reduced[i][j]
+    }
+    if (minVal !== Infinity && minVal > 0) {
+      reductionCost += minVal
+      for (let i = 0; i < n; i++) {
+        if (reduced[i][j] !== Infinity) reduced[i][j] -= minVal
+      }
+    }
+  }
+
+  return { reduced, reductionCost }
+}
+
 export function runBranchAndBound(dist) {
   const n = dist.length
   const t0 = performance.now()
 
-  // Start with nearest-neighbor upper bound for better pruning
+  // Start with nearest-neighbor upper bound for better initial pruning
   const nn = nearestNeighbor(dist, n)
   let bestCost = nn.cost
   let bestPath = [...nn.path]
 
-  const visited = new Array(n).fill(false)
-  visited[0] = true
+  // Setup initial infinite matrix: diag = Infinity
+  const initialMatrix = dist.map((row, i) =>
+    row.map((val, j) => (i === j || val <= 0) ? Infinity : val)
+  )
 
-  function dfs(curr, path, cost) {
+  const root = reduceMatrix(initialMatrix)
+
+  function search(curr, path, visitedMask, currentLB, currentMatrix) {
     if (path.length === n) {
-      const ret = dist[curr][0]
-      if (!ret || ret <= 0) return
-      const total = cost + ret
-      if (total < bestCost) {
-        bestCost = total
-        bestPath = [...path, 0]
+      const retCost = dist[curr][0]
+      if (retCost > 0) {
+        const total = currentLB + currentMatrix[curr][0] // Since matrix holds remaining reduced cost
+        const actualCost = calculateActualCost(dist, [...path, 0])
+        if (actualCost < bestCost) {
+          bestCost = actualCost
+          bestPath = [...path, 0]
+        }
       }
       return
     }
 
-    // Collect and sort candidates by distance (for better pruning)
-    const candidates = []
+    // Sort next destinations by direct distance to visit promising paths first
+    const destinations = []
     for (let v = 0; v < n; v++) {
-      if (!visited[v] && dist[curr][v] > 0) {
-        candidates.push(v)
+      if (!(visitedMask & (1 << v)) && currentMatrix[curr][v] !== Infinity) {
+        destinations.push({ city: v, cost: currentMatrix[curr][v] })
       }
     }
-    candidates.sort((a, b) => dist[curr][a] - dist[curr][b])
+    destinations.sort((a, b) => a.cost - b.cost)
 
-    for (const next of candidates) {
-      const newCost = cost + dist[curr][next]
-      if (newCost >= bestCost) break // Sorted — prune remaining too
-      visited[next] = true
-      dfs(next, [...path, next], newCost)
-      visited[next] = false
+    for (const { city: next } of destinations) {
+      // 1. Copy matrix and set row/col restrictions
+      const nextMatrix = currentMatrix.map(row => [...row])
+      
+      // Set row curr to Infinity (cannot leave curr again)
+      for (let j = 0; j < n; j++) nextMatrix[curr][j] = Infinity
+      // Set col next to Infinity (cannot enter next again)
+      for (let i = 0; i < n; i++) nextMatrix[i][next] = Infinity
+      // Prevent returning to start city early
+      nextMatrix[next][0] = Infinity
+
+      // 2. Reduce the new matrix
+      const { reduced, reductionCost } = reduceMatrix(nextMatrix)
+
+      // 3. Compute child Lower Bound
+      // LB = parent_LB + reduced_cost_to_next + reduction_cost_of_new_matrix
+      const nextLB = currentLB + currentMatrix[curr][next] + reductionCost
+
+      // Prune if estimated lower bound is worse than or equal to current best
+      if (nextLB >= bestCost) continue
+
+      search(next, [...path, next], visitedMask | (1 << next), nextLB, reduced)
     }
   }
 
-  dfs(0, [0], 0)
+  search(0, [0], 1, root.reductionCost, root.reduced)
 
-  return result(bestPath, bestCost, t0, 'O(n!) worst, heavily pruned', 'O(n)')
+  return result(bestPath, bestCost, t0, 'O(n!) worst, matrix-reduced search', 'O(n²)', checkMetricTSP(dist))
+}
+
+function calculateActualCost(dist, path) {
+  let cost = 0
+  for (let i = 0; i < path.length - 1; i++) {
+    cost += dist[path[i]][path[i + 1]]
+  }
+  return cost
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -193,7 +292,7 @@ export function runChristofides(dist) {
   for (let i = 0; i < path.length - 1; i++) cost += dist[path[i]][path[i + 1]]
 
   return {
-    ...result(path, cost, t0, 'O(n³)', 'O(n²)'),
+    ...result(path, cost, t0, 'O(n³)', 'O(n²)', checkMetricTSP(dist)),
     isApproximate: true,
     approximationRatio: '≤ 1.5× optimal',
   }
@@ -264,13 +363,14 @@ function hierholzer(adjInput) {
   return circuit
 }
 
-function result(path, cost, t0, timeC, spaceC) {
+function result(path, cost, t0, timeC, spaceC, metricCheck) {
   return {
     path,
     cost,
     executionTime: performance.now() - t0,
     timeComplexity: timeC,
     spaceComplexity: spaceC,
+    metricCheck,
   }
 }
 

@@ -56,37 +56,45 @@ export default function AlgorithmsInfo() {
     bb: {
       name: 'Branch & Bound (Exact Search)',
       complexity: 'O(n!) worst case',
-      space: 'O(n)',
+      space: 'O(n²)',
       type: 'Exact / Optimal Search',
-      theory: 'Branch & Bound is a state-space search algorithm that prunes branches of a search tree which cannot possibly lead to an optimal solution. It uses a lower bound to estimate the minimum potential cost of completing any partial path.',
+      theory: 'Branch & Bound is a state-space search algorithm that prunes branches of a search tree which cannot possibly lead to an optimal solution. It uses a reduced cost matrix lower bound to estimate the minimum potential cost of completing any partial path.',
       howItWorks: [
-        'Explore the search tree in a Depth-First Search (DFS) or Best-First Search order.',
-        'At each node in the search tree, calculate a lower bound (LB) on the cost of any tour extending from the current partial path.',
-        'If the current partial path cost + LB is greater than or equal to the best completed tour cost found so far (the upper bound), immediately prune the branch.',
-        'Sort nodes by edge weights before exploring (heuristic sorting) to find low-cost complete tours early, allowing for aggressive pruning.'
+        'Perform a Depth-First Search (DFS) traversal of the state-space tree starting at city 0.',
+        'At each state, reduce the cost matrix by subtracting row minimums and column minimums. The sum of these values constitutes the node\'s Lower Bound (LB).',
+        'When transitioning from city u to city v, restrict the matrix by making row u, column v, and entry (v, 0) infinite, and re-reduce.',
+        'The child\'s Lower Bound is computed as: LB_child = LB_parent + reduced_dist(u, v) + reduction_cost_child.',
+        'If LB_child is greater than or equal to the best completed tour cost found so far, prune the entire branch immediately.'
       ],
-      pseudocode: `function dfs(currCity, path, cost):
+      pseudocode: `function solveB_and_B(dist, n):
+  initialMatrix = prepareInfiniteDiag(dist)
+  root = reduceMatrix(initialMatrix)
+  search(0, [0], 1, root.reductionCost, root.reduced)
+
+function search(curr, path, visitedMask, currentLB, currentMatrix):
   if path.length == n:
-    returnCost = cost + dist[currCity][0]
-    if returnCost < bestCost:
-      bestCost = returnCost
+    actualCost = getActualCost(path)
+    if actualCost < bestCost:
+      bestCost = actualCost
       bestPath = path + [0]
     return
 
-  // Sort neighbors by distance to find a good path quickly
-  candidates = sortNeighbors(currCity)
-  for nextCity in candidates:
-    newCost = cost + dist[currCity][nextCity]
-    
-    // Simple Bounding: if current cost exceeds best cost, prune
-    if newCost >= bestCost: 
-      break // Since sorted, other candidates will also exceed
-      
-    visited[nextCity] = true
-    dfs(nextCity, path + [nextCity], newCost)
-    visited[nextCity] = false`,
-      pros: ['Requires almost no extra memory (O(n) recursion stack).', 'For average-case symmetric inputs, executes significantly faster than dynamic programming through pruning.'],
-      cons: ['Worst-case complexity is O(n!), which occurs on dense graphs with equal/uniform weights.', 'Unpredictable execution times depending on the cost matrix topology.']
+  destinations = getSortedUnvisitedNeighbors(curr, currentMatrix)
+  for nextCity in destinations:
+    nextMatrix = clone(currentMatrix)
+    setRowInf(nextMatrix, curr)
+    setColInf(nextMatrix, nextCity)
+    nextMatrix[nextCity][0] = Infinity // Prevent early cycles
+
+    reductionCost = reduce(nextMatrix)
+    nextLB = currentLB + currentMatrix[curr][nextCity] + reductionCost
+
+    if nextLB >= bestCost:
+      continue // Prune branch
+
+    search(nextCity, path + [nextCity], visitedMask | (1 << nextCity), nextLB, nextMatrix)`,
+      pros: ['Guarantees mathematical optimality.', 'Prunes large subsets of solutions early via reduced matrix lower bounds, running much faster than brute force.'],
+      cons: ['Worst-case complexity is O(n!) when pruning is ineffective (e.g. uniform edge weights).', 'Requires recursive matrix copies which increases memory usage to O(n²) compared to standard DFS.']
     },
     ch: {
       name: 'Christofides Algorithm (Approximation)',

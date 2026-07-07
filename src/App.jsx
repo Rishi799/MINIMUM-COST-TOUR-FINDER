@@ -843,6 +843,34 @@ function ResultsSection({ results, n, dist, algoName }) {
         )}
       </div>
 
+      {/* Metric Verification Banner */}
+      {results.metricCheck && (
+        <div className="glass-card animate-fade-in" style={{
+          padding: '14px 18px',
+          borderRadius: 14,
+          marginBottom: 20,
+          borderLeft: results.metricCheck.isMetric ? '3px solid #10b981' : '3px solid #f59e0b',
+          background: results.metricCheck.isMetric ? 'rgba(16,185,129,0.03)' : 'rgba(245,158,11,0.03)',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 12
+        }}>
+          <span style={{ fontSize: '1.2rem', color: results.metricCheck.isMetric ? '#10b981' : '#f59e0b', lineHeight: 1 }}>
+            {results.metricCheck.isMetric ? '✓' : '⚠'}
+          </span>
+          <div style={{ fontSize: '0.78rem', lineHeight: 1.5 }}>
+            <span style={{ fontWeight: 700, color: results.metricCheck.isMetric ? '#34d399' : '#f59e0b' }}>
+              {results.metricCheck.isMetric ? 'Metric TSP Network Verified' : 'Non-Metric Network Detected'}
+            </span>
+            <span style={{ color: 'rgba(148,163,184,0.7)', marginLeft: 8 }}>
+              {results.metricCheck.isMetric 
+                ? 'The triangle inequality d(A,C) ≤ d(A,B) + d(B,C) holds across all cities. Christofides 1.5× approximation is guaranteed.' 
+                : `${results.metricCheck.reason}. The Christofides 1.5× approximation ratio limit may not hold.`}
+            </span>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 18 }}>
         {/* Left: metrics */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -948,6 +976,34 @@ function ComparisonResults({ allResults, n, dist }) {
           <div style={{ color: 'rgba(100,116,139,1)', fontSize: '0.75rem', marginTop: 2 }}>All three algorithms solved — side-by-side results</div>
         </div>
       </div>
+
+      {/* Metric Verification Banner */}
+      {allResults[0]?.metricCheck && (
+        <div className="glass-card animate-fade-in" style={{
+          padding: '14px 18px',
+          borderRadius: 14,
+          marginBottom: 20,
+          borderLeft: allResults[0].metricCheck.isMetric ? '3px solid #10b981' : '3px solid #f59e0b',
+          background: allResults[0].metricCheck.isMetric ? 'rgba(16,185,129,0.03)' : 'rgba(245,158,11,0.03)',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 12
+        }}>
+          <span style={{ fontSize: '1.2rem', color: allResults[0].metricCheck.isMetric ? '#10b981' : '#f59e0b', lineHeight: 1 }}>
+            {allResults[0].metricCheck.isMetric ? '✓' : '⚠'}
+          </span>
+          <div style={{ fontSize: '0.78rem', lineHeight: 1.5 }}>
+            <span style={{ fontWeight: 700, color: allResults[0].metricCheck.isMetric ? '#34d399' : '#f59e0b' }}>
+              {allResults[0].metricCheck.isMetric ? 'Metric TSP Network Verified' : 'Non-Metric Network Detected'}
+            </span>
+            <span style={{ color: 'rgba(148,163,184,0.7)', marginLeft: 8 }}>
+              {allResults[0].metricCheck.isMetric 
+                ? 'The triangle inequality d(A,C) ≤ d(A,B) + d(B,C) holds across all cities. Christofides 1.5× approximation is guaranteed.' 
+                : `${allResults[0].metricCheck.reason}. The Christofides 1.5× approximation ratio limit may not hold.`}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16, marginBottom: 24 }}>
