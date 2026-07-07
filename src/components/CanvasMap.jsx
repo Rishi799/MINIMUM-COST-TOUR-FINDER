@@ -62,8 +62,8 @@ export default function CanvasMap() {
 
   const handleSvgClick = (e) => {
     if (e.target.tagName !== 'svg' && e.target.id !== 'svg-bg') return
-    if (cities.length >= 12) {
-      alert('Maximum of 12 cities allowed for stability.')
+    if (cities.length >= 20) {
+      alert('Maximum of 20 cities allowed for stability.')
       return
     }
 
@@ -97,8 +97,8 @@ export default function CanvasMap() {
       setInputErr('Y coordinate must be an integer between 20 and 380.')
       return
     }
-    if (cities.length >= 12) {
-      setInputErr('Maximum of 12 cities allowed for stability.')
+    if (cities.length >= 20) {
+      setInputErr('Maximum of 20 cities allowed for stability.')
       return
     }
 
@@ -228,6 +228,17 @@ export default function CanvasMap() {
       alert('Please place at least 2 cities.')
       return
     }
+
+    if (selectedAlgo === 'bb' && cities.length > 14) {
+      alert(`Branch & Bound has factorial O(N!) worst-case complexity.\nRunning it for N = ${cities.length} would likely freeze the browser.\n\nPlease select Held-Karp (Exact DP) or Christofides (1.5× Approx) instead.`);
+      return;
+    }
+
+    if (selectedAlgo === 'hk' && cities.length > 18) {
+      const ok = window.confirm(`Held-Karp bitmask DP has O(2ⁿ·n²) complexity.\nFor N = ${cities.length}, computing ~1 million states might take 2-4 seconds.\n\nDo you want to proceed?`);
+      if (!ok) return;
+    }
+
     setIsRunning(true)
     setResults(null)
     setAllResults(null)
@@ -265,23 +276,45 @@ export default function CanvasMap() {
 
     setTimeout(() => {
       try {
-        const algos = [
-          { fn: runBranchAndBound, name: 'Branch & Bound', accent: '#10b981' },
-          { fn: runHeldKarp, name: 'Held-Karp', accent: '#3b82f6' },
-          { fn: runChristofides, name: 'Christofides', accent: '#8b5cf6' },
-        ]
+        const algos = []
+        if (cities.length <= 14) {
+          algos.push({ fn: runBranchAndBound, name: 'Branch & Bound', accent: '#10b981' })
+        } else {
+          algos.push({ 
+            fn: () => ({ 
+              path: [0, 0], 
+              cost: 0, 
+              executionTime: 0, 
+              timeComplexity: 'O(n!)', 
+              spaceComplexity: 'O(n²)',
+              error: 'Skipped (Too slow for N > 14)' 
+            }), 
+            name: 'Branch & Bound', 
+            accent: '#10b981' 
+          })
+        }
+        algos.push({ fn: runHeldKarp, name: 'Held-Karp', accent: '#3b82f6' })
+        algos.push({ fn: runChristofides, name: 'Christofides', accent: '#8b5cf6' })
+
         const res = algos.map(a => {
           const r = a.fn(matrix)
           const adjustedPath = adjustPathToStart(r.path, startNodeIndex)
           return { ...r, path: adjustedPath, name: a.name, accent: a.accent }
-        }).filter(r => !r.error)
+        })
 
-        if (res.length === 0) { alert('No valid tour found.'); return }
+        // Filter out actual crash errors but keep our intentional 'Skipped' status
+        const validResults = res.filter(r => !r.error || r.error.includes('Skipped'))
+
+        if (validResults.length === 0) { alert('No valid tour found.'); return }
         
-        // Pick winner as the primary result
-        const winner = res.reduce((best, r) => r.cost < best.cost ? r : best, res[0])
+        // Pick winner as the primary result (ignore skipped B&B when determining winner)
+        const activeResults = validResults.filter(r => !r.error)
+        const winner = activeResults.length > 0 
+          ? activeResults.reduce((best, r) => r.cost < best.cost ? r : best, activeResults[0])
+          : validResults[0]
+
         setResults(winner)
-        setAllResults(res)
+        setAllResults(validResults)
       } catch (e) {
         alert('Solving error: ' + e.message)
       } finally {
@@ -356,11 +389,11 @@ export default function CanvasMap() {
           <p style={{ color: 'rgba(100,116,139,1)', fontSize: '0.75rem', marginTop: 2 }}>Click canvas to add cities, drag to move, double-click to remove</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={() => generateRandomLayout(6)} className="btn-outline" style={{ padding: '8px 14px', borderRadius: 10, fontSize: '0.8rem', cursor: 'pointer' }}>
-            Random (6)
-          </button>
           <button onClick={() => generateRandomLayout(10)} className="btn-outline" style={{ padding: '8px 14px', borderRadius: 10, fontSize: '0.8rem', cursor: 'pointer' }}>
             Random (10)
+          </button>
+          <button onClick={() => generateRandomLayout(20)} className="btn-outline" style={{ padding: '8px 14px', borderRadius: 10, fontSize: '0.8rem', cursor: 'pointer' }}>
+            Random (20)
           </button>
           <button onClick={() => { setCities([]); setResults(null); setAllResults(null); setStartNodeIndex(0) }} className="btn-outline" style={{ padding: '8px 14px', borderRadius: 10, fontSize: '0.8rem', cursor: 'pointer', borderColor: 'rgba(239,68,68,0.2)', color: '#f87171' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.06)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
             Clear
@@ -846,6 +879,28 @@ export default function CanvasMap() {
               
               {allResults.map((r, i) => {
                 const isWinner = r === allResults.reduce((b, x) => x.cost < b.cost ? x : b, allResults[0])
+                const isSkipped = r.error && r.error.includes('Skipped')
+
+                if (isSkipped) {
+                  return (
+                    <div key={r.name} style={{
+                      padding: '10px 12px', borderRadius: 10, marginBottom: 8,
+                      background: 'rgba(255,255,255,0.01)',
+                      border: '1px dashed rgba(255,255,255,0.08)',
+                      opacity: 0.5,
+                      animation: `fadeUp 0.3s ease ${i * 0.1}s both`,
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#64748b' }} />
+                          <span style={{ color: 'rgba(148,163,184,0.6)', fontSize: '0.78rem', fontWeight: 700 }}>{r.name}</span>
+                        </div>
+                        <span style={{ color: '#f87171', fontSize: '0.68rem', fontWeight: 600 }}>Skipped (N &gt; 14)</span>
+                      </div>
+                    </div>
+                  )
+                }
+
                 return (
                   <div key={r.name} style={{
                     padding: '10px 12px', borderRadius: 10, marginBottom: 8,

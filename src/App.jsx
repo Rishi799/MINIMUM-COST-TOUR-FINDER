@@ -426,11 +426,11 @@ function ConfigStep({ onContinue }) {
   const [method, setMethod] = useState('manual')
   const [err, setErr] = useState('')
 
-  const presets = [4, 6, 8, 10]
+  const presets = [5, 10, 15, 20]
 
   const go = () => {
     const v = parseInt(n, 10)
-    if (!v || v < 2 || v > 10) { setErr('Enter a number between 2 and 10.'); return }
+    if (!v || v < 2 || v > 20) { setErr('Enter a number between 2 and 20.'); return }
     setErr(''); onContinue(v, method)
   }
 
@@ -469,15 +469,15 @@ function ConfigStep({ onContinue }) {
           </div>
           <input
             id="num-cities-input"
-            type="number" min="2" max="10"
+            type="number" min="2" max="20"
             value={n}
             onChange={e => { setN(e.target.value); setErr('') }}
             className="hero-input"
-            placeholder="Custom (2–10)"
+            placeholder="Custom (2–20)"
             style={{ width: '100%', borderRadius: 12, padding: '14px 16px', fontSize: '0.95rem' }}
           />
           <div style={{ color: 'rgba(71,85,105,1)', fontSize: '0.72rem', marginTop: 8 }}>
-            Supports 2–10 cities · All three algorithms work optimally in this range
+            Supports 2–20 cities · Note: B&B / Held-Karp can take several seconds for N &gt; 12.
           </div>
         </div>
 
@@ -1008,6 +1008,42 @@ function ComparisonResults({ allResults, n, dist }) {
         {allResults.map((r, i) => {
           const isWinner = r === winner
           const accent = accents[r.name] || '#3b82f6'
+          const isSkipped = r.error && r.error.includes('Skipped')
+
+          if (isSkipped) {
+            return (
+              <div
+                key={r.name}
+                className="glass-card comparison-card"
+                style={{
+                  padding: '24px',
+                  opacity: 0.5,
+                  border: '1px dashed rgba(255,255,255,0.15)',
+                  background: 'rgba(255,255,255,0.01)',
+                  animation: `fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) ${i * 0.1}s both`,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(148,163,184,0.5)',
+                    fontWeight: 800, fontSize: '0.75rem', fontFamily: "'Space Grotesk',sans-serif"
+                  }}>
+                    B&B
+                  </div>
+                  <div>
+                    <div style={{ color: 'rgba(148,163,184,0.6)', fontWeight: 700, fontSize: '0.9rem', fontFamily: "'Space Grotesk',sans-serif" }}>{r.name}</div>
+                    <div style={{ color: 'rgba(71,85,105,1)', fontSize: '0.68rem' }}>O(n!) complexity</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '24px 0', padding: '12px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.02)', border: '1px solid rgba(239,68,68,0.15)', color: '#f87171', fontSize: '0.75rem', lineHeight: 1.4 }}>
+                  <span style={{ fontWeight: 700 }}>⚠ Execution Skipped</span>
+                  <span>Factorial complexity exceeds safe processing limits for N &gt; 14.</span>
+                </div>
+              </div>
+            )
+          }
+
           return (
             <div
               key={r.name}
@@ -1144,6 +1180,21 @@ export default function App() {
 
   const handleSolve = useCallback((algoId) => {
     const names = { bb: 'Branch & Bound', hk: 'Held-Karp', ch: 'Christofides' }
+    
+    if (algoId === 'bb' && matrix.length > 14) {
+      alert(`Branch & Bound has factorial O(N!) worst-case complexity.\nRunning it for N = ${matrix.length} would likely freeze the browser.\n\nPlease select Held-Karp (Exact DP) or Christofides (1.5× Approx) instead.`);
+      setIsRunning(false);
+      return;
+    }
+
+    if (algoId === 'hk' && matrix.length > 18) {
+      const ok = window.confirm(`Held-Karp bitmask DP has O(2ⁿ·n²) complexity.\nFor N = ${matrix.length}, computing ~1 million states might take 2-4 seconds.\n\nDo you want to proceed?`);
+      if (!ok) {
+        setIsRunning(false);
+        return;
+      }
+    }
+
     setAlgoName(names[algoId]); setIsRunning(true); setResults(null); setAllResults(null)
     setTimeout(() => {
       try {
@@ -1163,17 +1214,36 @@ export default function App() {
     setIsRunning(true); setResults(null); setAllResults(null)
     setTimeout(() => {
       try {
-        const algos = [
-          { fn: runBranchAndBound, name: 'Branch & Bound' },
-          { fn: runHeldKarp, name: 'Held-Karp' },
-          { fn: runChristofides, name: 'Christofides' },
-        ]
+        const algos = []
+        if (matrix.length <= 14) {
+          algos.push({ fn: runBranchAndBound, name: 'Branch & Bound' })
+        } else {
+          // Push a dummy/skipped result so it matches python benchmark's skipped status card
+          algos.push({ 
+            fn: () => ({ 
+              path: [0, 0], 
+              cost: 0, 
+              executionTime: 0, 
+              timeComplexity: 'O(n!)', 
+              spaceComplexity: 'O(n²)',
+              error: 'Skipped (Too slow for N > 14)' 
+            }), 
+            name: 'Branch & Bound' 
+          })
+        }
+        algos.push({ fn: runHeldKarp, name: 'Held-Karp' })
+        algos.push({ fn: runChristofides, name: 'Christofides' })
+
         const results = algos.map(a => {
           const res = a.fn(matrix)
           return { ...res, name: a.name }
-        }).filter(r => !r.error)
-        if (results.length === 0) { alert('No valid tour found.'); return }
-        setAllResults(results)
+        })
+        
+        // Filter out actual crash errors but keep our intentional 'Skipped' status
+        const validResults = results.filter(r => !r.error || r.error.includes('Skipped'))
+        
+        if (validResults.length === 0) { alert('No valid tour found.'); return }
+        setAllResults(validResults)
         setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
       } catch (e) { alert('Algorithm error: ' + e.message) }
       finally { setIsRunning(false) }
@@ -1237,7 +1307,7 @@ export default function App() {
                     </div>
                     <div className="hero-chip">
                       <span className="chip-dot" style={{ background: '#3b82f6' }} />
-                      Up to 10 Cities
+                      Up to 20 Cities
                     </div>
                     <div className="hero-chip">
                       <span className="chip-dot" style={{ background: '#8b5cf6' }} />
