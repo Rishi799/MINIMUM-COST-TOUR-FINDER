@@ -3,10 +3,10 @@ import { runHeldKarp, runBranchAndBound, runChristofides, cityLabel } from '../a
 
 export default function CanvasMap() {
   const [cities, setCities] = useState([
-    { id: 0, x: 100, y: 150, label: 'A' },
-    { id: 1, x: 250, y: 100, label: 'B' },
-    { id: 2, x: 450, y: 180, label: 'C' },
-    { id: 3, x: 300, y: 300, label: 'D' },
+    { id: 0, x: 100, y: 250, label: 'A' },
+    { id: 1, x: 220, y: 120, label: 'B' },
+    { id: 2, x: 480, y: 160, label: 'C' },
+    { id: 3, x: 340, y: 320, label: 'D' },
   ])
   const [draggingId, setDraggingId] = useState(null)
   const [selectedAlgo, setSelectedAlgo] = useState('bb')
@@ -19,8 +19,16 @@ export default function CanvasMap() {
   const [copied, setCopied] = useState(false)
   const [replayStep, setReplayStep] = useState(-1)
   const [isReplaying, setIsReplaying] = useState(false)
-  const replayTimer = useRef(null)
+  
+  // Custom coordinate input states
+  const [customX, setCustomX] = useState('')
+  const [customY, setCustomY] = useState('')
+  const [inputErr, setInputErr] = useState('')
 
+  // Custom start city/origin state
+  const [startNodeIndex, setStartNodeIndex] = useState(0)
+
+  const replayTimer = useRef(null)
   const svgRef = useRef(null)
 
   // Recalculate Euclidean distance matrix whenever cities change via memoization
@@ -40,6 +48,17 @@ export default function CanvasMap() {
     }
     return m
   }, [cities])
+
+  // Helper: Cyclic-shift the path to start and end at the chosen origin city
+  const adjustPathToStart = useCallback((path, startIdx) => {
+    if (!path || path.length <= 1) return path
+    // path is like [0, 2, 1, 3, 0]. The last element is identical to the first.
+    const cycle = path.slice(0, -1) // [0, 2, 1, 3]
+    const pos = cycle.indexOf(startIdx)
+    if (pos === -1) return path // fallback
+    const shifted = [...cycle.slice(pos), ...cycle.slice(0, pos)]
+    return [...shifted, startIdx]
+  }, [])
 
   const handleSvgClick = (e) => {
     if (e.target.tagName !== 'svg' && e.target.id !== 'svg-bg') return
@@ -65,13 +84,49 @@ export default function CanvasMap() {
     setAllResults(null)
   }
 
-  const handleNodeRemove = (id) => {
-    setCities(cities.filter(c => c.id !== id).map((c, index) => ({
-      ...c,
-      label: cityLabel(index),
-    })))
+  const handleAddCustomNode = () => {
+    setInputErr('')
+    const px = parseInt(customX, 10)
+    const py = parseInt(customY, 10)
+
+    if (isNaN(px) || px < 20 || px > 580) {
+      setInputErr('X coordinate must be an integer between 20 and 580.')
+      return
+    }
+    if (isNaN(py) || py < 20 || py > 380) {
+      setInputErr('Y coordinate must be an integer between 20 and 380.')
+      return
+    }
+    if (cities.length >= 12) {
+      setInputErr('Maximum of 12 cities allowed for stability.')
+      return
+    }
+
+    const nextId = cities.length > 0 ? Math.max(...cities.map(c => c.id)) + 1 : 0
+    const newCity = {
+      id: nextId,
+      x: px,
+      y: py,
+      label: cityLabel(cities.length),
+    }
+
+    setCities([...cities, newCity])
+    setCustomX('')
+    setCustomY('')
     setResults(null)
     setAllResults(null)
+  }
+
+  const handleNodeRemove = (id) => {
+    const updatedCities = cities.filter(c => c.id !== id).map((c, index) => ({
+      ...c,
+      label: cityLabel(index),
+    }))
+    setCities(updatedCities)
+    setResults(null)
+    setAllResults(null)
+    // Adjust startNodeIndex if it is out of bounds now
+    setStartNodeIndex(prev => Math.min(prev, Math.max(0, updatedCities.length - 1)))
   }
 
   const handlePointerDown = (id, e) => {
@@ -165,6 +220,7 @@ export default function CanvasMap() {
     setCities(arr)
     setResults(null)
     setAllResults(null)
+    setStartNodeIndex(0)
   }
 
   const solveTSP = () => {
@@ -185,6 +241,8 @@ export default function CanvasMap() {
         if (res.error) {
           alert(res.error)
         } else {
+          // Adjust path to start at selected startNodeIndex
+          res.path = adjustPathToStart(res.path, startNodeIndex)
           setResults(res)
         }
       } catch (e) {
@@ -214,7 +272,8 @@ export default function CanvasMap() {
         ]
         const res = algos.map(a => {
           const r = a.fn(matrix)
-          return { ...r, name: a.name, accent: a.accent }
+          const adjustedPath = adjustPathToStart(r.path, startNodeIndex)
+          return { ...r, path: adjustedPath, name: a.name, accent: a.accent }
         }).filter(r => !r.error)
 
         if (res.length === 0) { alert('No valid tour found.'); return }
@@ -303,7 +362,7 @@ export default function CanvasMap() {
           <button onClick={() => generateRandomLayout(10)} className="btn-outline" style={{ padding: '8px 14px', borderRadius: 10, fontSize: '0.8rem', cursor: 'pointer' }}>
             Random (10)
           </button>
-          <button onClick={() => { setCities([]); setResults(null); setAllResults(null) }} className="btn-outline" style={{ padding: '8px 14px', borderRadius: 10, fontSize: '0.8rem', cursor: 'pointer', borderColor: 'rgba(239,68,68,0.2)', color: '#f87171' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.06)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+          <button onClick={() => { setCities([]); setResults(null); setAllResults(null); setStartNodeIndex(0) }} className="btn-outline" style={{ padding: '8px 14px', borderRadius: 10, fontSize: '0.8rem', cursor: 'pointer', borderColor: 'rgba(239,68,68,0.2)', color: '#f87171' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.06)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
             Clear
           </button>
         </div>
@@ -487,7 +546,7 @@ export default function CanvasMap() {
             {/* Render node circles */}
             {cities.map((city, index) => {
               const isDragging = draggingId === city.id
-              const isStart = index === 0
+              const isStart = index === startNodeIndex
               const isInPath = results?.path.includes(index)
 
               return (
@@ -585,6 +644,94 @@ export default function CanvasMap() {
             <h3 style={{ color: 'white', fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: '1rem', marginBottom: 16 }}>Solving Engine</h3>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              
+              {/* Custom Coordinate Node Adder Form */}
+              <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 16 }}>
+                <label style={{ display: 'block', color: 'rgba(148,163,184,0.6)', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+                  Add City Node
+                </label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="number"
+                    value={customX}
+                    onChange={e => setCustomX(e.target.value)}
+                    placeholder="X (20-580)"
+                    className="hero-input"
+                    style={{ flex: 1, borderRadius: 8, padding: '8px 12px', fontSize: '0.78rem', textAlign: 'center' }}
+                  />
+                  <input
+                    type="number"
+                    value={customY}
+                    onChange={e => setCustomY(e.target.value)}
+                    placeholder="Y (20-380)"
+                    className="hero-input"
+                    style={{ flex: 1, borderRadius: 8, padding: '8px 12px', fontSize: '0.78rem', textAlign: 'center' }}
+                  />
+                  <button
+                    onClick={handleAddCustomNode}
+                    className="btn-outline"
+                    style={{ borderRadius: 8, padding: '8px 14px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', height: 34 }}
+                  >
+                    Add
+                  </button>
+                </div>
+                {inputErr && (
+                  <div style={{ color: '#f87171', fontSize: '0.68rem', marginTop: 6, fontWeight: 500 }}>
+                    ⚠ {inputErr}
+                  </div>
+                )}
+              </div>
+
+              {/* Start/Origin City Selector Dropdown */}
+              <div>
+                <label style={{ display: 'block', color: 'rgba(148,163,184,0.6)', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+                  Select Start City (Origin)
+                </label>
+                <select
+                  value={startNodeIndex}
+                  onChange={e => {
+                    const newStartIdx = parseInt(e.target.value, 10)
+                    setStartNodeIndex(newStartIdx)
+                    // If results are active, cyclic shift them immediately to make the UI response snappy
+                    if (results) {
+                      setResults(prev => ({
+                        ...prev,
+                        path: adjustPathToStart(prev.path, newStartIdx)
+                      }))
+                    }
+                    if (allResults) {
+                      setAllResults(prev => prev.map(r => ({
+                        ...r,
+                        path: adjustPathToStart(r.path, newStartIdx)
+                      })))
+                    }
+                  }}
+                  className="hero-input"
+                  style={{
+                    width: '100%',
+                    borderRadius: 10,
+                    padding: '10px 14px',
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    color: 'white',
+                    outline: 'none',
+                  }}
+                  disabled={cities.length === 0}
+                >
+                  {cities.length === 0 ? (
+                    <option value="0">No cities placed</option>
+                  ) : (
+                    cities.map((c, idx) => (
+                      <option key={c.id} value={idx} style={{ background: '#0a0f1d', color: 'white' }}>
+                        City {c.label} ({c.x}, {c.y}) {idx === 0 ? ' (Default)' : ''}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
               <div>
                 <label style={{ display: 'block', color: 'rgba(148,163,184,0.6)', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
                   Select Algorithm
