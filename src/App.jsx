@@ -371,6 +371,13 @@ function drawNodes(ctx, pos, n, path, dist, completedEdges = Infinity) {
   const radius = Math.min(500, 400) * 0.34
   const cx = 250, cy = 200
 
+  const nodeRadius = n > 12 ? 12 : 16
+  const innerFont = n > 12 ? 'bold 10px Inter,sans-serif' : 'bold 12px Inter,sans-serif'
+  const outerFont = n > 12 ? '8px Inter,sans-serif' : '10px Inter,sans-serif'
+  const outerOffset = n > 12 ? 22 : 30
+  const pulseRadius = n > 12 ? 22 : 28
+  const glowRadius = n > 12 ? 22 : 30
+
   pos.forEach((p, i) => {
     const isStart = i === 0
     const inRoute = path?.includes(i)
@@ -383,7 +390,7 @@ function drawNodes(ctx, pos, n, path, dist, completedEdges = Infinity) {
     if (justArrived) {
       ctx.save()
       ctx.beginPath()
-      ctx.arc(p.x, p.y, 28, 0, Math.PI * 2)
+      ctx.arc(p.x, p.y, pulseRadius, 0, Math.PI * 2)
       ctx.strokeStyle = isStart ? 'rgba(245,158,11,0.4)' : 'rgba(59,130,246,0.4)'
       ctx.lineWidth = 2
       ctx.stroke()
@@ -391,13 +398,13 @@ function drawNodes(ctx, pos, n, path, dist, completedEdges = Infinity) {
     }
 
     // Outer glow
-    const gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 30)
+    const gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowRadius)
     gr.addColorStop(0, isStart ? 'rgba(245,158,11,0.4)' : 'rgba(59,130,246,0.3)')
     gr.addColorStop(1, 'transparent')
-    ctx.beginPath(); ctx.arc(p.x, p.y, 30, 0, Math.PI * 2); ctx.fillStyle = gr; ctx.fill()
+    ctx.beginPath(); ctx.arc(p.x, p.y, glowRadius, 0, Math.PI * 2); ctx.fillStyle = gr; ctx.fill()
 
     // Node circle
-    ctx.beginPath(); ctx.arc(p.x, p.y, 16, 0, Math.PI * 2)
+    ctx.beginPath(); ctx.arc(p.x, p.y, nodeRadius, 0, Math.PI * 2)
     ctx.fillStyle = isStart ? '#78350f' : (inRoute && isReached) ? '#1e3a8a' : '#0f172a'
     ctx.fill()
     ctx.strokeStyle = isStart ? '#f59e0b' : '#3b82f6'
@@ -405,15 +412,15 @@ function drawNodes(ctx, pos, n, path, dist, completedEdges = Infinity) {
     ctx.stroke()
 
     // Label
-    ctx.fillStyle = 'white'; ctx.font = 'bold 12px Inter,sans-serif'
+    ctx.fillStyle = 'white'; ctx.font = innerFont
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
     ctx.fillText(cityLabel(i), p.x, p.y)
 
     // Outer label
     const a = (2 * Math.PI * i / n) - Math.PI / 2
-    const lr = radius + 30
+    const lr = radius + outerOffset
     ctx.fillStyle = isStart ? 'rgba(251,191,36,0.7)' : 'rgba(148,163,184,0.6)'
-    ctx.font = '10px Inter,sans-serif'
+    ctx.font = outerFont
     ctx.fillText(cityLabel(i), cx + lr * Math.cos(a), cy + lr * Math.sin(a))
   })
 }
@@ -949,12 +956,15 @@ function ResultsSection({ results, n, dist, algoName }) {
 function ComparisonResults({ allResults, n, dist }) {
   if (!allResults || allResults.length === 0) return null
 
-  // Find winner (lowest cost, then fastest time)
-  const winner = allResults.reduce((best, r) => {
-    if (r.cost < best.cost) return r
-    if (r.cost === best.cost && r.executionTime < best.executionTime) return r
-    return best
-  }, allResults[0])
+  // Find winner (lowest cost, then fastest time, ignoring skipped algorithms)
+  const activeResults = allResults.filter(r => !r.error || !r.error.includes('Skipped'))
+  const winner = activeResults.length > 0
+    ? activeResults.reduce((best, r) => {
+        if (r.cost < best.cost) return r
+        if (r.cost === best.cost && r.executionTime < best.executionTime) return r
+        return best
+      }, activeResults[0])
+    : allResults[0]
 
   const accents = { 'Branch & Bound': '#10b981', 'Held-Karp': '#3b82f6', 'Christofides': '#8b5cf6' }
 
